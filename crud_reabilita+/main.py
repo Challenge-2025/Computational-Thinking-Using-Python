@@ -1,4 +1,4 @@
-from controller.usuario import cadastrar, mostrardados, alterardados, apagarconta
+from controller.usuario import cadastrar, mostrarDados, alterarDados, apagarConta, menuAjuda
 
 def menu():
     usuarios = {}
@@ -10,14 +10,15 @@ def menu():
         print("3. Confirmar dados")
         print("4. Alterar dados")
         print("5. Apagar conta")
-        print("6. Sair")
+        print("6. Duvidas")
+        print("0. Sair")
         
         print("----------------------")
         opcao = int(input("Digite a opção desejada: "))
         print("----------------------")
 
-        if (opcao == 3 and usuarios == ""):
-            print("Não foi possivel acessar seus dados efetue o cadastro primeiro!")
+        if (opcao == 3 and not usuarios):
+            print("Não foi possível acessar seus dados. Efetue o cadastro primeiro!")
         else:
 
             
@@ -45,17 +46,21 @@ def menu():
 
                 case 3:
                     cpf = input("Digite seu CPF para consultar os dados:" )
-                    mostrardados(usuarios, cpf)
+                    mostrarDados(usuarios, cpf)
 
                 case 4:
                     cpf = input("Digite seu CPF: ")
-                    alterardados(usuarios, cpf)
+                    alterarDados(usuarios, cpf)
 
                 case 5:
                     cpf = input("Digite seu CPF: ")
-                    apagarconta(usuarios, cpf)
+                    apagarConta(usuarios, cpf)
 
                 case 6:
+                    cpf = input("Digite seu CPF: ")
+                    menuAjuda(usuarios, cpf)
+
+                case 0:
                     print("\nSaindo do sistema...")
                     break
 
