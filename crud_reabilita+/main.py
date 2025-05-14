@@ -20,16 +20,14 @@ def menu():
         if (opcao == 3 and not usuarios):
             print("Não foi possível acessar seus dados. Efetue o cadastro primeiro!")
         else:
-
-            
             match opcao:
                 case 1:
                     cpf = input("Digite seu CPF: ")
-                    senhaC = input("Digite sua senha: ")
+                    senhaC = input("Digite sua senha: ").upper()
 
                     if cpf not in usuarios:
                         print("\nCPF não encontrado. Por favor, cadastre-se primeiro.")
-                    elif usuarios[cpf]["senha"] == senhaC:
+                    elif usuarios[cpf]["acesso"]["senha"] == senhaC:
                         print("\nLogin bem-sucedido!")
                     else:
                         print("\nSenha incorreta.")
@@ -37,7 +35,7 @@ def menu():
                 case 2:
                     nomeCompleto = input("Digite seu nome completo: ")
                     cpf = input("Digite seu CPF: ")
-                    senhaR = input("Digite sua senha: ")
+                    senhaR = input("Digite sua senha: ").upper()
                     cartaoSus = input("Digite seu número do cartão SUS: ")
                     cep = input("Digite seu CEP: ")
                     complemento = input("Digite seu complemento: ")
