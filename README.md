@@ -1,12 +1,12 @@
 # 🩺 Reabilita+ — Sistema de Cadastro e Login para Usuários da Saúde
 
-> Projeto desenvolvido no contexto da disciplina de Pensamento Computacional com Python.Um sistema de terminal simples que permite o cadastro, login e gerenciamento de dados de usuários da área da saúde.
+> Projeto desenvolvido no contexto da disciplina de Computacional Thinking Using Python. Um sistema de terminal simples que permite o cadastro, login e gerenciamento de dados de usuários da área da saúde.
 
 ## 👨‍💻 Autores
 
-- Bruno Andrade Zanateli  
-- Gabriel Bebé da Silva  
-- Pedro Ferreira Gomes
+- Bruno Andrade Zanateli RM563736
+- Gabriel Bebé da Silva  RM562012
+- Pedro Ferreira Gomes RM575824
 
 ## 🚀 Funcionalidades
 
