@@ -1,20 +1,30 @@
-from controller.usuario import cadastrar, mostrarDados, alterarDados, apagarConta, menuAjuda
+from controller.usuario import UsuarioManager
+
 
 def menu():
     usuarios = {}
+    usario_manager = UsuarioManager()
     print("\n ------- Seja Bem-vindo(a) ao Reabilita+ -------")
     while True:
-        
         print("1. Login")
         print("2. Cadastrar")
         print("3. Confirmar dados")
         print("4. Alterar dados")
         print("5. Apagar conta")
-        print("6. Duvidas")
+        print("6. Dúvidas")
         print("0. Sair")
-        
         print("----------------------")
-        opcao = int(input("Digite a opção desejada: "))
+
+        try:
+            opcao = int(input("Digite a opção desejada: "))
+        except ValueError:
+            print("Entrada inválida! Digite apenas números (0 a 6).")
+            print("----------------------")
+            continue
+        except EOFError:
+            print("\nEntrada finalizada inesperadamente. Saindo...")
+            break
+
         print("----------------------")
 
         if (opcao == 3 and not usuarios):
@@ -24,13 +34,19 @@ def menu():
                 case 1:
                     cpf = input("Digite seu CPF: ")
                     senhaC = input("Digite sua senha: ").upper()
-
-                    if cpf not in usuarios:
-                        print("\nCPF não encontrado. Por favor, cadastre-se primeiro.")
-                    elif usuarios[cpf]["acesso"]["senha"] == senhaC:
-                        print("\nLogin bem-sucedido!")
-                    else:
-                        print("\nSenha incorreta.")
+                    try:
+                        if usuarios[cpf]["acesso"]["senha"] == senhaC:
+                            print("----------------------")
+                            print("Login bem-sucedido!")
+                            print("----------------------")
+                        else:
+                            print("----------------------")
+                            print("Senha incorreta.")
+                            print("----------------------")
+                    except KeyError:
+                        print("----------------------")
+                        print("CPF não encontrado. Por favor, cadastre-se primeiro.")
+                        print("----------------------")
 
                 case 2:
                     nomeCompleto = input("Digite seu nome completo: ")
@@ -39,31 +55,33 @@ def menu():
                     cartaoSus = input("Digite seu número do cartão SUS: ")
                     cep = input("Digite seu CEP: ")
                     complemento = input("Digite seu complemento: ")
-
-                    cadastrar(usuarios, nomeCompleto, cpf, cartaoSus, cep, complemento, senhaR)
+                    usario_manager.cadastrar(usuarios, nomeCompleto, cpf, cartaoSus, cep, complemento, senhaR)
 
                 case 3:
-                    cpf = input("Digite seu CPF para consultar os dados:" )
-                    mostrarDados(usuarios, cpf)
+                    cpf = input("Digite seu CPF para consultar os dados: ")
+                    usario_manager.mostrarDados(usuarios, cpf)
 
                 case 4:
                     cpf = input("Digite seu CPF: ")
-                    alterarDados(usuarios, cpf)
+                    usario_manager.alterarDados(usuarios, cpf)
 
                 case 5:
                     cpf = input("Digite seu CPF: ")
-                    apagarConta(usuarios, cpf)
+                    usario_manager.apagarConta(usuarios, cpf)
 
                 case 6:
                     cpf = input("Digite seu CPF: ")
-                    menuAjuda(usuarios, cpf)
+                    usario_manager.menuAjuda(usuarios, cpf)
 
                 case 0:
-                    print("\nSaindo do sistema...")
+                    print("Saindo do sistema...")
+                    print("----------------------")
                     break
 
                 case _:
-                    print("\nOpção inválida. Tente novamente.")
+                    print("----------------------")
+                    print("Opção inválida. Tente novamente.")
+                    print("----------------------")
 
 if __name__ == "__main__":
     menu()
