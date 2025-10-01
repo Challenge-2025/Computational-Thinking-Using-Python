@@ -5,8 +5,8 @@
 
 ## 👨‍💻 Autores
 
-- Gabriel Bebé da Silva  
-- Pedro Ferreira Gomes
+- Gabriel Bebé da Silva RM562012  
+- Pedro Ferreira Gomes RM565824
 
 ## 🚀 Funcionalidades
 
@@ -42,3 +42,5 @@
 - Agendamento de consultas
 - Validações mais robustas (ex: formato do CPF, campos obrigatórios)
 - Testes automatizados
+
+## Link para video do Youtube: https://youtu.be/kZMGAB4O1cM
