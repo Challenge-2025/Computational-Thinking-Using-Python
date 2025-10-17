@@ -1,46 +1,50 @@
-# 🩺 Reabilita+ — Sistema de Cadastro e Login para Usuários da Saúde
+# 🩺 Reabilita+ — Sistema de Gerenciamento de Usuários da Saúde (Sprint 4)
 
-
-> Projeto desenvolvido no contexto da disciplina de Pensamento Computacional com Python.Um sistema de terminal simples que permite o cadastro, login e gerenciamento de dados de usuários da área da saúde. Sistema orientado a objetos, com as operações de usuário encapsuladas em uma classe para maior organização e reutilização.
+> Projeto desenvolvido para a disciplina de Pensamento Computacional com Python. O sistema evoluiu de um protótipo em memória para uma aplicação robusta com persistência de dados em banco de dados, consumo de API externa e exportação de dados.
 
 ## 👨‍💻 Autores
 
-- Gabriel Bebé da Silva RM562012  
+- Gabriel Bebé da Silva RM562012
 - Pedro Ferreira Gomes RM565824
 
-## 🚀 Funcionalidades
+## 🚀 Funcionalidades da Sprint 4
 
-- ✅ Menu interativo com opções:
-  - Login
-  - Cadastro
-  - Consulta de dados
-  - Alteração de dados
-  - Exclusão de conta
-  - Ajuda
-  - Sair
-- ✅ Cadastro completo do usuário:
-  - Nome completo
-  - CPF
-  - Cartão SUS
-  - Endereço (CEP e complemento)
-  - Senha
-- ✅ Estrutura de dados organizada com dicionários
-- ✅ Validações básicas:
-  - CPF já cadastrado
-  - Login com verificação de CPF e senha
-- ✅ Menu de ajuda com opções simuladas (pronto para futuras funcionalidades)
+- ✅ **Integração com Banco de Dados SQLite:**
+  - Os dados dos usuários são agora armazenados de forma persistente no arquivo `reabilita.db`.
+  - Utiliza o módulo `sqlite3` do Python para todas as operações de banco de dados.
 
-## 🧠 Organização do Código
+- ✅ **CRUD Completo e Funcional:**
+  - **CREATE:** Cadastro de novos usuários no banco de dados.
+  - **READ:** Consulta de dados de usuários existentes.
+  - **UPDATE:** Alteração de informações como nome, CEP, complemento e senha.
+  - **DELETE:** Remoção da conta do usuário do sistema.
 
-- `main.py`: contém a lógica principal do menu e navegação do sistema.
-- `controller/usuario.py`: módulo com a classe `UsuarioManager`, responsável pelas operações de cadastro, alteração, exclusão, exibição de dados e menu de ajuda dos usuários.
-- Estrutura pensada para ser reutilizável, organizada e extensível em sprints futuras.
+- ✅ **Consumo de API Externa (ViaCEP):**
+  - Durante o cadastro, o sistema consulta a API do ViaCEP para validar o CEP e exibir o endereço correspondente, melhorando a experiência do usuário.
 
-## 🔮 Futuras Melhorias (Sprint futura)
+- ✅ **Exportação de Dados para JSON:**
+  - Nova funcionalidade no menu que permite ao usuário exportar seus dados (exceto a senha) para um arquivo `dados_usuario.json`.
 
-- Integração com banco de dados
-- Agendamento de consultas
-- Validações mais robustas (ex: formato do CPF, campos obrigatórios)
-- Testes automatizados
+- ✅ **Estrutura de Código Modular:**
+  - `main.py`: Interface principal do usuário e fluxo do programa.
+  - `controller/usuario.py`: Classe `UsuarioManager` que encapsula toda a lógica de negócio e interação com o banco.
+  - `database.py`: Módulo dedicado à conexão e configuração inicial do banco de dados.
 
-## Link para video do Youtube: https://youtu.be/kZMGAB4O1cM
+## 🛠️ Tecnologias Utilizadas
+
+- **Linguagem:** Python 3
+- **Banco de Dados:** SQLite 3
+- **API Externa:** ViaCEP (`requests`)
+- **Manipulação de Dados:** `json`
+
+## 🔮 Próximos Passos
+
+- Integração com o front-end desenvolvido em outras disciplinas.
+- Desenvolvimento e/ou consumo de uma API REST para comunicação entre o back-end Python e o front-end.
+- Validações de dados mais robustas (formato de CPF, força da senha, etc.).
+- Implementação de testes automatizados.
+
+## 🎥 Link para o Vídeo Explicativo (Sprint 4)
+
+*Substitua pelo novo link do vídeo da Sprint 4*
+https://youtu.be/kZMGAB4O1cM
