@@ -6,16 +6,23 @@ def conectar():
     return conn
 
 def criar_tabela_usuarios():
-    """Cria a tabela de usuários se ela não existir."""
+    """Cria a tabela de usuários se ela não existir, agora alinhada com o front-end."""
     conn = conectar()
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             cpf TEXT PRIMARY KEY,
             nome TEXT NOT NULL,
-            cartao_sus TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            telefone TEXT,
+            nascimento TEXT,
+            deficiencia TEXT,
             cep TEXT NOT NULL,
+            logradouro TEXT,
+            numero TEXT NOT NULL,
             complemento TEXT,
+            bairro TEXT,
+            cidade TEXT,
             senha TEXT NOT NULL
         )
     ''')
@@ -24,4 +31,4 @@ def criar_tabela_usuarios():
 
 if __name__ == '__main__':
     criar_tabela_usuarios()
-    print("Banco de dados e tabela de usuários criados com sucesso.")
+    print("Banco de dados e tabela de usuários atualizados com sucesso para o modelo do front-end.")

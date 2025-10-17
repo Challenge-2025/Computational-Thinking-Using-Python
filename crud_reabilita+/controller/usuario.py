@@ -1,127 +1,188 @@
-'''Uma clsse de usuarios realizando um armazenamento de funções com foco de conseguir ser mais organizado e reutilizavel'''
+import sqlite3
+import requests
+import json
+from database import conectar
 
 class UsuarioManager:
     def __init__(self):
-        self.usuarios = {}
+        pass
 
-    def cadastrar(self,usuarios, nomeCompleto, cpf, cartaoSus, cep, complemento, senhaR):
-        '''Cadastra o usário ao sistema'''
-        usuarios[cpf] = {
-            "dados_pessoais": {
-                "nome": nomeCompleto,
-                "cpf": cpf,
-                "cartao_sus": cartaoSus
-            },
-            "endereco": {
-                "cep": cep,
-                "complemento": complemento
-            },
-            "acesso": {
-                "senha": senhaR
-            }
-        }
+    def buscar_endereco_por_cep(self, cep):
+        """Busca o endereço correspondente a um CEP usando a API ViaCEP e retorna os dados."""
+        try:
+            response = requests.get(f"https://viacep.com.br/ws/{cep.replace('-', '')}/json/")
+            response.raise_for_status()
+            dados_cep = response.json()
+            if "erro" not in dados_cep:
+                print("\n--- Endereço Encontrado via API ---")
+                print(f"Logradouro: {dados_cep.get('logradouro', 'N/A')}")
+                print(f"Bairro: {dados_cep.get('bairro', 'N/A')}")
+                print(f"Cidade: {dados_cep.get('localidade', 'N/A')}")
+                print("---------------------------------")
+                return dados_cep
+            else:
+                print("\nCEP não encontrado.")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"\nErro ao consultar o CEP: {e}")
+            return None
+
+    def cadastrar(self, dados_usuario):
+        '''Cadastra o usuário no banco de dados com base nos campos do front-end.'''
         
-        print(f"\nUsuário {nomeCompleto} cadastrado com sucesso!")
-        print(f"CPF: {cpf}")
-        print(f"Cartão SUS: {cartaoSus}")
-        print(f"CEP: {cep}")
-        print(f"Complemento: {complemento}")
-        print("----------------------")
+        endereco_api = self.buscar_endereco_por_cep(dados_usuario['cep'])
+        if not endereco_api:
+            print("Cadastro cancelado devido a CEP inválido.")
+            return
 
-    def mostrarDados(self,usuarios, cpf):
-        """Mostra os dados do usuário no sistema"""
+        dados_usuario['logradouro'] = endereco_api.get('logradouro', '')
+        dados_usuario['bairro'] = endereco_api.get('bairro', '')
+        dados_usuario['cidade'] = endereco_api.get('localidade', '')
+
+        conn = conectar()
+        cursor = conn.cursor()
         try:
-            dados = usuarios[cpf]  
-            print("\n--- Dados do Usuário ---")
-            print(f"Nome: {dados['dados_pessoais']['nome']}")
-            print(f"CPF: {dados['dados_pessoais']['cpf']}")
-            print(f"Cartão SUS: {dados['dados_pessoais']['cartao_sus']}")
-            print(f"CEP: {dados['endereco']['cep']}")
-            print(f"Complemento: {dados['endereco']['complemento']}")
-            print("----------------------")
-        except KeyError as e:
-            print(f"\nErro: usuário ou campo '{e}' não encontrado.")
-            print("----------------------")
-        except Exception:
-            print("\nOcorreu um erro inesperado ao tentar acessar os dados.")
-            print("----------------------")
+            cursor.execute('''
+                INSERT INTO usuarios (cpf, nome, email, telefone, nascimento, deficiencia, cep, logradouro, numero, complemento, bairro, cidade, senha)
+                VALUES (:cpf, :nome, :email, :telefone, :nascimento, :deficiencia, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :senha)
+            ''', dados_usuario)
+            conn.commit()
+            print(f"\nUsuário {dados_usuario['nome']} cadastrado com sucesso!")
+        except sqlite3.IntegrityError as e:
+            print(f"\nErro de integridade: {e}. O CPF ou E-mail já podem estar cadastrados.")
+        except Exception as e:
+            print(f"\nOcorreu um erro inesperado: {e}")
+        finally:
+            conn.close()
 
-
-    def alterarDados(self,usuarios, cpf):
-        """Alterar dados do usario dentro do sistema"""
+    def mostrarDados(self, cpf):
+        """Mostra os dados do usuário a partir do banco de dados."""
+        conn = conectar()
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
         try:
-            dados = usuarios[cpf]  
+            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
+            usuario = cursor.fetchone()
+            if usuario:
+                print("\n--- Dados do Usuário ---")
+                for key in usuario.keys():
+                    if key != 'senha': # Não exibir a senha
+                        print(f"{key.capitalize()}: {usuario[key]}")
+                print("----------------------")
+            else:
+                print("\nUsuário não encontrado.")
+        except Exception as e:
+            print(f"\nOcorreu um erro inesperado: {e}")
+        finally:
+            conn.close()
+
+    def alterarDados(self, cpf):
+        """Altera dados do usuário no banco de dados."""
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
+            if not cursor.fetchone():
+                print("\nUsuário não encontrado.")
+                return
+
             print("\n--- Alterar Dados Atuais do Usuário ---")
             print("1. Nome")
             print("2. CEP")
             print("3. Complemento")
             print("4. Senha")
             print("0. Cancelar")
-
             print("----------------------")
             opcao = input("Qual dado deseja alterar? ")
             print("----------------------")
 
+            campo = None
+            novo_valor = None
+
             if opcao == "1":
-                novo_nome = input("Digite o novo nome: ")
-                usuarios[cpf]["dados_pessoais"]["nome"] = novo_nome
+                campo = "nome"
+                novo_valor = input("Digite o novo nome: ")
             elif opcao == "2":
                 novo_cep = input("Digite o novo CEP: ")
-                usuarios[cpf]["endereco"]["cep"] = novo_cep
+                if self._buscar_endereco_por_cep(novo_cep):
+                    campo = "cep"
+                    novo_valor = novo_cep
+                else:
+                    print("Alteração cancelada, CEP inválido.")
+                    return
             elif opcao == "3":
-                novo_complemento = input("Digite o novo complemento: ")
-                usuarios[cpf]["endereco"]["complemento"] = novo_complemento
+                campo = "complemento"
+                novo_valor = input("Digite o novo complemento: ")
             elif opcao == "4":
-                nova_senha = input("Digite a nova senha: ")
-                usuarios[cpf]["acesso"]["senha"] = nova_senha
+                campo = "senha"
+                novo_valor = input("Digite a nova senha: ").upper()
             elif opcao == "0":
                 print("Alteração cancelada.")
-                print("----------------------")
                 return
             else:
                 print("Opção inválida.")
-                print("----------------------")
                 return
 
-            print("Dados atualizados com sucesso!")
-            print("----------------------")
-        except KeyError as e:
-            print(f"\nErro: usuário ou campo '{e}' não encontrado.")
-            print("----------------------")
-        except Exception:
-            print("\nOcorreu um erro inesperado ao tentar alterar os dados.")
-            print("----------------------")
-
-
-    def apagarConta(self,usuarios, cpf):
-        """Deleta a conta do usuário no sistema"""
-        try:
-            if cpf not in usuarios:
-                print("\nUsuário não encontrado.")
-                print("----------------------")
-                return
-
-            confirmacao = input("Tem certeza que deseja deletar a conta? (s/n): ").lower()
-            print("----------------------")
-
-            if confirmacao == "s":
-                del usuarios[cpf]
-                print("Conta deletada com sucesso!")
-                print("----------------------")
-            elif confirmacao == "n":
-                print("Processo para deletar a conta cancelado!")
-                print("----------------------")
-            else:
-                print("Opção inválida, tente novamente.")
-                print("----------------------")
-
-        except KeyError as e:
-            print(f"\nErro: usuário ou campo '{e}' não encontrado.")
-            print("----------------------")
+            if campo and novo_valor is not None:
+                cursor.execute(f"UPDATE usuarios SET {campo} = ? WHERE cpf = ?", (novo_valor, cpf))
+                conn.commit()
+                print("Dados atualizados com sucesso!")
         except Exception as e:
             print(f"\nOcorreu um erro inesperado: {e}")
-            print("----------------------")
+        finally:
+            conn.close()
 
+    def apagarConta(self, cpf):
+        """Deleta a conta do usuário do banco de dados."""
+        confirmacao = input("Tem certeza que deseja deletar a conta? (s/n): ").lower()
+        if confirmacao == "s":
+            conn = conectar()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("DELETE FROM usuarios WHERE cpf = ?", (cpf,))
+                conn.commit()
+                if cursor.rowcount > 0:
+                    print("Conta deletada com sucesso!")
+                else:
+                    print("\nUsuário não encontrado.")
+            except Exception as e:
+                print(f"\nOcorreu um erro inesperado: {e}")
+            finally:
+                conn.close()
+        elif confirmacao == "n":
+            print("Processo para deletar a conta cancelado!")
+        else:
+            print("Opção inválida, tente novamente.")
+
+    def exportar_para_json(self, cpf):
+        """Exporta os dados de um usuário para um arquivo JSON."""
+        conn = conectar()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
+            usuario_tuple = cursor.fetchone()
+
+            if not usuario_tuple:
+                print("\nUsuário não encontrado.")
+                return
+
+            usuario_dict = {
+                "cpf": usuario_tuple[0],
+                "nome": usuario_tuple[1],
+                "cartao_sus": usuario_tuple[2],
+                "cep": usuario_tuple[3],
+                "complemento": usuario_tuple[4],
+            }
+
+            with open("dados_usuario.json", "w", encoding="utf-8") as json_file:
+                json.dump(usuario_dict, json_file, indent=4, ensure_ascii=False)
+            
+            print(f"\nDados do usuário {usuario_dict['nome']} exportados com sucesso para 'dados_usuario.json'.")
+
+        except Exception as e:
+            print(f"\nOcorreu um erro inesperado ao exportar para JSON: {e}")
+        finally:
+            conn.close()
 
             
 
