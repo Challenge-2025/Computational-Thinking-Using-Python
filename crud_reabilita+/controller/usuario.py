@@ -7,6 +7,15 @@ class UsuarioManager:
     def __init__(self):
         pass
 
+    def _usuario_existe(self, cpf):
+        """Verifica se um usuário existe no banco de dados."""
+        conn = conectar()
+        cursor = conn.cursor()
+        cursor.execute("SELECT cpf FROM usuarios WHERE cpf = ?", (cpf,))
+        resultado = cursor.fetchone()
+        conn.close()
+        return resultado is not None
+
     def buscar_endereco_por_cep(self, cep):
         """Busca o endereço correspondente a um CEP usando a API ViaCEP e retorna os dados."""
         try:
@@ -66,8 +75,8 @@ class UsuarioManager:
             if usuario:
                 print("\n--- Dados do Usuário ---")
                 for key in usuario.keys():
-                    if key != 'senha': # Não exibir a senha
-                        print(f"{key.capitalize()}: {usuario[key]}")
+                    if key != 'senha':
+                        print(f"{key.replace('_', ' ').capitalize()}: {usuario[key]}")
                 print("----------------------")
             else:
                 print("\nUsuário não encontrado.")
@@ -78,55 +87,45 @@ class UsuarioManager:
 
     def alterarDados(self, cpf):
         """Altera dados do usuário no banco de dados."""
+        if not self._usuario_existe(cpf):
+            print("\nUsuário não encontrado.")
+            return
+
+        print("\n--- Qual dado deseja alterar? ---")
+        opcoes = {
+            "1": "nome", "2": "email", "3": "telefone", "4": "cep", 
+            "5": "numero", "6": "complemento", "7": "senha"
+        }
+        for key, value in opcoes.items():
+            print(f"{key}. {value.capitalize()}")
+        print("0. Cancelar")
+        print("----------------------")
+        
+        opcao = input("Digite a opção: ")
+        if opcao == "0":
+            print("Alteração cancelada.")
+            return
+        if opcao not in opcoes:
+            print("Opção inválida.")
+            return
+
+        campo = opcoes[opcao]
+        novo_valor = input(f"Digite o novo valor para {campo}: ")
+        
         conn = conectar()
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
-            if not cursor.fetchone():
-                print("\nUsuário não encontrado.")
-                return
-
-            print("\n--- Alterar Dados Atuais do Usuário ---")
-            print("1. Nome")
-            print("2. CEP")
-            print("3. Complemento")
-            print("4. Senha")
-            print("0. Cancelar")
-            print("----------------------")
-            opcao = input("Qual dado deseja alterar? ")
-            print("----------------------")
-
-            campo = None
-            novo_valor = None
-
-            if opcao == "1":
-                campo = "nome"
-                novo_valor = input("Digite o novo nome: ")
-            elif opcao == "2":
-                novo_cep = input("Digite o novo CEP: ")
-                if self._buscar_endereco_por_cep(novo_cep):
-                    campo = "cep"
-                    novo_valor = novo_cep
-                else:
+            if campo == 'cep':
+                endereco = self.buscar_endereco_por_cep(novo_valor)
+                if not endereco:
                     print("Alteração cancelada, CEP inválido.")
                     return
-            elif opcao == "3":
-                campo = "complemento"
-                novo_valor = input("Digite o novo complemento: ")
-            elif opcao == "4":
-                campo = "senha"
-                novo_valor = input("Digite a nova senha: ").upper()
-            elif opcao == "0":
-                print("Alteração cancelada.")
-                return
-            else:
-                print("Opção inválida.")
-                return
+                cursor.execute("UPDATE usuarios SET logradouro = ?, bairro = ?, cidade = ? WHERE cpf = ?", 
+                               (endereco.get('logradouro', ''), endereco.get('bairro', ''), endereco.get('localidade', ''), cpf))
 
-            if campo and novo_valor is not None:
-                cursor.execute(f"UPDATE usuarios SET {campo} = ? WHERE cpf = ?", (novo_valor, cpf))
-                conn.commit()
-                print("Dados atualizados com sucesso!")
+            cursor.execute(f"UPDATE usuarios SET {campo} = ? WHERE cpf = ?", (novo_valor.upper() if campo == 'senha' else novo_valor, cpf))
+            conn.commit()
+            print("\nDados atualizados com sucesso!")
         except Exception as e:
             print(f"\nOcorreu um erro inesperado: {e}")
         finally:
@@ -134,6 +133,10 @@ class UsuarioManager:
 
     def apagarConta(self, cpf):
         """Deleta a conta do usuário do banco de dados."""
+        if not self._usuario_existe(cpf):
+            print("\nUsuário não encontrado.")
+            return
+
         confirmacao = input("Tem certeza que deseja deletar a conta? (s/n): ").lower()
         if confirmacao == "s":
             conn = conectar()
@@ -141,44 +144,34 @@ class UsuarioManager:
             try:
                 cursor.execute("DELETE FROM usuarios WHERE cpf = ?", (cpf,))
                 conn.commit()
-                if cursor.rowcount > 0:
-                    print("Conta deletada com sucesso!")
-                else:
-                    print("\nUsuário não encontrado.")
+                print("\nConta deletada com sucesso!")
             except Exception as e:
                 print(f"\nOcorreu um erro inesperado: {e}")
             finally:
                 conn.close()
-        elif confirmacao == "n":
-            print("Processo para deletar a conta cancelado!")
         else:
-            print("Opção inválida, tente novamente.")
+            print("\nOperação cancelada.")
 
     def exportar_para_json(self, cpf):
         """Exporta os dados de um usuário para um arquivo JSON."""
         conn = conectar()
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
-            usuario_tuple = cursor.fetchone()
-
-            if not usuario_tuple:
+            usuario = cursor.fetchone()
+            if not usuario:
                 print("\nUsuário não encontrado.")
                 return
 
-            usuario_dict = {
-                "cpf": usuario_tuple[0],
-                "nome": usuario_tuple[1],
-                "cartao_sus": usuario_tuple[2],
-                "cep": usuario_tuple[3],
-                "complemento": usuario_tuple[4],
-            }
+            # Converte o objeto Row em um dicionário e remove a senha
+            usuario_dict = dict(usuario)
+            del usuario_dict['senha']
 
-            with open("dados_usuario.json", "w", encoding="utf-8") as json_file:
+            with open(f"dados_{cpf}.json", "w", encoding="utf-8") as json_file:
                 json.dump(usuario_dict, json_file, indent=4, ensure_ascii=False)
             
-            print(f"\nDados do usuário {usuario_dict['nome']} exportados com sucesso para 'dados_usuario.json'.")
-
+            print(f"\nDados do usuário {usuario_dict['nome']} exportados com sucesso para 'dados_{cpf}.json'.")
         except Exception as e:
             print(f"\nOcorreu um erro inesperado ao exportar para JSON: {e}")
         finally:

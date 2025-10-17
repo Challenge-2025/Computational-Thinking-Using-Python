@@ -18,15 +18,15 @@ def menu():
     criar_tabela_usuarios()
     
     usuario_manager = UsuarioManager()
-    print("\n ------- Seja Bem-vindo(a) ao Reabilita+ -------")
+    print("\n ------- Seja Bem-vindo(a) ao Reabilita+ (Ferramenta de Gestão) -------")
     while True:
         print("\n--- Menu Principal ---")
         print("1. Login")
-        print("2. Cadastrar")
-        print("3. Consultar meus dados")
-        print("4. Alterar dados")
-        print("5. Apagar conta")
-        print("6. Exportar dados para JSON")
+        print("2. Cadastrar Novo Usuário")
+        print("3. Consultar Dados de Usuário")
+        print("4. Alterar Dados de Usuário")
+        print("5. Apagar Conta de Usuário")
+        print("6. Exportar Dados para JSON")
         print("7. Ajuda")
         print("0. Sair")
         print("----------------------")
@@ -41,56 +41,55 @@ def menu():
 
         match opcao:
             case 1:
-                cpf = input("Digite seu CPF: ")
-                senhaC = input("Digite sua senha: ").upper()
+                cpf = input("Digite o CPF do usuário: ")
+                senhaC = input("Digite a senha: ").upper()
                 if login_valido(cpf, senhaC):
-                    print("----------------------")
-                    print("Login bem-sucedido!")
-                    print("----------------------")
+                    print("\nLogin bem-sucedido!")
                 else:
-                    print("----------------------")
-                    print("CPF ou senha incorretos.")
-                    print("----------------------")
+                    print("\nCPF ou senha incorretos.")
 
             case 2:
-                nomeCompleto = input("Digite seu nome completo: ")
-                cpf = input("Digite seu CPF: ")
-                senhaR = input("Crie sua senha: ").upper()
-                cartaoSus = input("Digite seu número do cartão SUS: ")
-                cep = input("Digite seu CEP: ")
-                complemento = input("Digite o complemento (ou deixe em branco): ")
-                usuario_manager.cadastrar(nomeCompleto, cpf, cartaoSus, cep, complemento, senhaR)
+                print("--- Cadastro de Novo Usuário ---")
+                dados_usuario = {
+                    "nome": input("Nome completo: "),
+                    "cpf": input("CPF: "),
+                    "email": input("E-mail: "),
+                    "telefone": input("Telefone: "),
+                    "nascimento": input("Data de nascimento (AAAA-MM-DD): "),
+                    "deficiencia": input("Possui deficiência? (SIM/NAO): "),
+                    "cep": input("CEP: "),
+                    "numero": input("Número da residência: "),
+                    "complemento": input("Complemento (opcional): "),
+                    "senha": input("Crie uma senha: ").upper()
+                }
+                usuario_manager.cadastrar(dados_usuario)
 
             case 3:
-                cpf = input("Digite seu CPF para consultar os dados: ")
+                cpf = input("Digite o CPF para consultar os dados: ")
                 usuario_manager.mostrarDados(cpf)
 
             case 4:
-                cpf = input("Digite seu CPF para alterar os dados: ")
+                cpf = input("Digite o CPF do usuário a ser alterado: ")
                 usuario_manager.alterarDados(cpf)
 
             case 5:
-                cpf = input("Digite seu CPF para apagar a conta: ")
+                cpf = input("Digite o CPF do usuário a ser apagado: ")
                 usuario_manager.apagarConta(cpf)
 
             case 6:
-                cpf = input("Digite seu CPF para exportar os dados: ")
+                cpf = input("Digite o CPF para exportar os dados: ")
                 usuario_manager.exportar_para_json(cpf)
                 
             case 7:
-                # Simulando que o usuário precisa estar "logado" para pedir ajuda
                 cpf = input("Digite seu CPF para acessar o menu de ajuda: ")
                 usuario_manager.menuAjuda(cpf)
 
             case 0:
                 print("Saindo do sistema...")
-                print("----------------------")
                 break
 
             case _:
-                print("----------------------")
                 print("Opção inválida. Tente novamente.")
-                print("----------------------")
 
 if __name__ == "__main__":
     menu()
