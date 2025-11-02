@@ -235,3 +235,37 @@ class UsuarioManager:
             print(f"\nOcorreu um erro inesperado: {e}")
             print("----------------------")
 
+
+    def chamar_chatbot_ia(self):
+        """
+        Chama a API de AI & Chatbot (app.py) que está rodando localmente
+        para classificar a intenção de uma pergunta.
+        """
+        print("\n--- Teste da API de IA (Chatbot) ---")
+        print("A API app.py deve estar rodando em http://127.0.0.1:5000")
+        
+        pergunta = input("Digite uma pergunta (ex: 'como agendo?'): ")
+        
+        if not pergunta:
+            print("Nenhuma pergunta inserida. Operação cancelada.")
+            return
+
+        try:
+            dados_json = {"pergunta": pergunta}
+            
+            response = requests.post("http://127.0.0.1:5000/prever_categoria", json=dados_json)
+            
+            response.raise_for_status()
+                     
+            resposta_json = response.json()
+            
+            print("\n--- Resposta da API de IA ---")
+            print(f"Pergunta Enviada: '{pergunta}'")
+            print(f"Categoria Prevista: '{resposta_json.get('categoria_prevista', 'N/A')}'")
+            print("-----------------------------")
+
+        except requests.exceptions.ConnectionError:
+            print("\nERRO: Não foi possível conectar à API de IA.")
+            print("Verifique se o script 'app.py' está em execução no outro terminal.")
+        except Exception as e:
+            print(f"\nOcorreu um erro inesperado ao chamar a API: {e}")
