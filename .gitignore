@@ -1,5 +1,17 @@
-__pycache__
+# Python
+__pycache__/
 *.pyc
+
+
+*.db
+*.sqlite
+*.sqlite3
+
+
 documentacao-py.pdf
-reabilita.db
+
+
+dados_paciente_*.json
+
+
 .gitignore
