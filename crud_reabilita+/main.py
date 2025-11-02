@@ -14,7 +14,6 @@ def login_valido(cpf, senha):
     return False
 
 def menu():
-    # Garante que a tabela exista ao iniciar o programa
     criar_tabela_usuarios()
     
     usuario_manager = UsuarioManager()
@@ -27,14 +26,15 @@ def menu():
         print("4. Alterar Dados de Usuário")
         print("5. Apagar Conta de Usuário")
         print("6. Exportar Dados para JSON")
-        print("7. Ajuda")
+        print("7. Ajuda (Simples)")
+        print("8. Testar API do Chatbot (IA)")
         print("0. Sair")
         print("----------------------")
 
         try:
             opcao = int(input("Digite a opção desejada: "))
         except ValueError:
-            print("Entrada inválida! Digite apenas números (0 a 7).")
+            print("Entrada inválida! Digite apenas números (0 a 8).")
             continue
         
         print("----------------------")
@@ -79,10 +79,12 @@ def menu():
             case 6:
                 cpf = input("Digite o CPF para exportar os dados: ")
                 usuario_manager.exportar_para_json(cpf)
-                
+
             case 7:
-                cpf = input("Digite seu CPF para acessar o menu de ajuda: ")
-                usuario_manager.menuAjuda(cpf)
+                usuario_manager.menuAjuda({}, None)
+
+            case 8:
+                usuario_manager.chamar_chatbot_ia()
 
             case 0:
                 print("Saindo do sistema...")
@@ -90,6 +92,7 @@ def menu():
 
             case _:
                 print("Opção inválida. Tente novamente.")
+# ...
 
 if __name__ == "__main__":
     menu()
