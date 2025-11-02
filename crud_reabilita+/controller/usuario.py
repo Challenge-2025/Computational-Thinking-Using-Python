@@ -1,4 +1,4 @@
-import sqlite3
+import oracledb
 import requests
 import json
 from database import conectar
@@ -7,15 +7,6 @@ class UsuarioManager:
     def __init__(self):
         pass
 
-    def _usuario_existe(self, cpf):
-        """Verifica se um usuário existe no banco de dados."""
-        conn = conectar()
-        cursor = conn.cursor()
-        cursor.execute("SELECT cpf FROM usuarios WHERE cpf = ?", (cpf,))
-        resultado = cursor.fetchone()
-        conn.close()
-        return resultado is not None
-
     def buscar_endereco_por_cep(self, cep):
         """Busca o endereço correspondente a um CEP usando a API ViaCEP e retorna os dados."""
         try:
@@ -23,7 +14,7 @@ class UsuarioManager:
             response.raise_for_status()
             dados_cep = response.json()
             if "erro" not in dados_cep:
-                print("\n--- Endereço Encontrado via API ---")
+                print("\n--- Endereço Encontrado via API (ViaCEP) ---")
                 print(f"Logradouro: {dados_cep.get('logradouro', 'N/A')}")
                 print(f"Bairro: {dados_cep.get('bairro', 'N/A')}")
                 print(f"Cidade: {dados_cep.get('localidade', 'N/A')}")
@@ -36,68 +27,163 @@ class UsuarioManager:
             print(f"\nErro ao consultar o CEP: {e}")
             return None
 
-    def cadastrar(self, dados_usuario):
-        '''Cadastra o usuário no banco de dados com base nos campos do front-end.'''
+    def _usuario_existe(self, cpf):
+        """Verifica se um paciente existe no banco de dados Oracle."""
+        conn = conectar()
+        if not conn:
+            return False
         
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT NR_CPF FROM T_RHSTU_PACIENTE WHERE NR_CPF = :cpf", {'cpf': cpf})
+            resultado = cursor.fetchone()
+            return resultado is not None
+        except oracledb.DatabaseError as e:
+            print(f"Erro ao verificar usuário: {e}")
+            return False
+        finally:
+            cursor.close()
+            conn.close()
+
+    def cadastrar(self, dados_usuario):
+        '''Cadastra o paciente e seu endereço no banco Oracle.'''
+
         endereco_api = self.buscar_endereco_por_cep(dados_usuario['cep'])
         if not endereco_api:
             print("Cadastro cancelado devido a CEP inválido.")
             return
 
-        dados_usuario['logradouro'] = endereco_api.get('logradouro', '')
-        dados_usuario['bairro'] = endereco_api.get('bairro', '')
-        dados_usuario['cidade'] = endereco_api.get('localidade', '')
-
         conn = conectar()
+        if not conn:
+            print("Cadastro cancelado. Não foi possível conectar ao banco.")
+            return
+        
         cursor = conn.cursor()
+        
         try:
-            cursor.execute('''
-                INSERT INTO usuarios (cpf, nome, email, telefone, nascimento, deficiencia, cep, logradouro, numero, complemento, bairro, cidade, senha)
-                VALUES (:cpf, :nome, :email, :telefone, :nascimento, :deficiencia, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :senha)
-            ''', dados_usuario)
+            id_paciente_var = cursor.var(int)
+
+            sql_paciente = """
+                INSERT INTO T_RHSTU_PACIENTE (
+                    NM_COMPLETO, NR_CPF, DT_NASCIMENTO, DS_EMAIL, 
+                    SENHA, NR_TELEFONE, FL_POSSUI_DEFICIENCIA
+                ) VALUES (
+                    :nome, :cpf, :nascimento, :email, 
+                    :senha, :telefone, :deficiencia
+                )
+                RETURNING ID_PACIENTE INTO :id_paciente_var
+            """
+            dados_paciente = {
+                'nome': dados_usuario['nome'],
+                'cpf': dados_usuario['cpf'],
+                'nascimento': dados_usuario['nascimento'],
+                'email': dados_usuario['email'],
+                'senha': dados_usuario['senha'],
+                'telefone': dados_usuario['telefone'],
+                'deficiencia': dados_usuario['deficiencia'].upper(),
+                'id_paciente_var': id_paciente_var
+            }
+            cursor.execute(sql_paciente, dados_paciente)
+            
+            id_paciente_gerado = id_paciente_var.getvalue()[0]
+            print(f"Paciente inserido com ID: {id_paciente_gerado}")
+
+            sql_endereco = """
+                INSERT INTO T_RHSTU_ENDERECO (
+                    NM_LOGRADOURO, NR_NUMERO, NM_COMPLEMENTO, NM_BAIRRO,
+                    NM_CIDADE, NR_CEP, ID_PACIENTE
+                ) VALUES (
+                    :logradouro, :numero, :complemento, :bairro,
+                    :cidade, :cep, :id_paciente
+                )
+            """
+
+            dados_endereco = {
+                'logradouro': endereco_api.get('logradouro', ''),
+                'numero': dados_usuario['numero'],
+                'complemento': dados_usuario.get('complemento', ''),
+                'bairro': endereco_api.get('bairro', ''),
+                'cidade': endereco_api.get('localidade', ''),
+                'cep': dados_usuario['cep'].replace('-', ''),
+                'id_paciente': id_paciente_gerado 
+            }
+            cursor.execute(sql_endereco, dados_endereco)
+
             conn.commit()
-            print(f"\nUsuário {dados_usuario['nome']} cadastrado com sucesso!")
-        except sqlite3.IntegrityError as e:
+            print(f"\nPaciente {dados_usuario['nome']} e seu endereço foram cadastrados com sucesso!")
+
+        except oracledb.IntegrityError as e:
+            conn.rollback()
             print(f"\nErro de integridade: {e}. O CPF ou E-mail já podem estar cadastrados.")
+        except oracledb.DatabaseError as e:
+            conn.rollback()
+            print(f"\nOcorreu um erro de banco de dados: {e}")
         except Exception as e:
+            conn.rollback()
             print(f"\nOcorreu um erro inesperado: {e}")
         finally:
+            cursor.close()
             conn.close()
 
     def mostrarDados(self, cpf):
-        """Mostra os dados do usuário a partir do banco de dados."""
+        """Mostra os dados do paciente e seu endereço (JOIN)."""
         conn = conectar()
-        conn.row_factory = sqlite3.Row 
+        if not conn:
+            return
+        
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
-            usuario = cursor.fetchone()
-            if usuario:
-                print("\n--- Dados do Usuário ---")
-                for key in usuario.keys():
-                    if key != 'senha':
-                        print(f"{key.replace('_', ' ').capitalize()}: {usuario[key]}")
+            sql_join = """
+                SELECT 
+                    P.NM_COMPLETO, P.NR_CPF, P.DS_EMAIL, P.NR_TELEFONE, 
+                    P.DT_NASCIMENTO, P.FL_POSSUI_DEFICIENCIA,
+                    E.NM_LOGRADOURO, E.NR_NUMERO, E.NM_COMPLEMENTO, 
+                    E.NM_BAIRRO, E.NM_CIDADE, E.NR_CEP
+                FROM 
+                    T_RHSTU_PACIENTE P
+                JOIN 
+                    T_RHSTU_ENDERECO E ON P.ID_PACIENTE = E.ID_PACIENTE
+                WHERE 
+                    P.NR_CPF = :cpf
+            """
+            cursor.execute(sql_join, {'cpf': cpf})
+            
+            # Pega os nomes das colunas
+            colunas = [d[0] for d in cursor.description]
+            paciente = cursor.fetchone()
+
+            if paciente:
+                print("\n--- Dados do Paciente ---")
+                dados_paciente = dict(zip(colunas, paciente))
+                for key, value in dados_paciente.items():
+                    print(f"{key.replace('_', ' ').capitalize()}: {value}")
                 print("----------------------")
             else:
-                print("\nUsuário não encontrado.")
-        except Exception as e:
-            print(f"\nOcorreu um erro inesperado: {e}")
+                print("\nPaciente não encontrado.")
+        except oracledb.DatabaseError as e:
+            print(f"\nErro ao consultar dados: {e}")
         finally:
+            cursor.close()
             conn.close()
 
     def alterarDados(self, cpf):
-        """Altera dados do usuário no banco de dados."""
+        """Altera dados do paciente ou endereço."""
         if not self._usuario_existe(cpf):
-            print("\nUsuário não encontrado.")
+            print("\nPaciente não encontrado.")
             return
 
         print("\n--- Qual dado deseja alterar? ---")
         opcoes = {
-            "1": "nome", "2": "email", "3": "telefone", "4": "cep", 
-            "5": "numero", "6": "complemento", "7": "senha"
+            "1": ("PACIENTE", "NM_COMPLETO"), 
+            "2": ("PACIENTE", "DS_EMAIL"), 
+            "3": ("PACIENTE", "NR_TELEFONE"), 
+            "4": ("ENDERECO", "NR_CEP"),
+            "5": ("ENDERECO", "NR_NUMERO"), 
+            "6": ("ENDERECO", "NM_COMPLEMENTO"), 
+            "7": ("PACIENTE", "SENHA")
         }
-        for key, value in opcoes.items():
-            print(f"{key}. {value.capitalize()}")
+        for key, (_, col) in opcoes.items():
+            print(f"{key}. {col.replace('_', ' ').capitalize()}")
         print("0. Cancelar")
         print("----------------------")
         
@@ -109,78 +195,158 @@ class UsuarioManager:
             print("Opção inválida.")
             return
 
-        campo = opcoes[opcao]
-        novo_valor = input(f"Digite o novo valor para {campo}: ")
+        tabela, campo = opcoes[opcao]
         
+        if campo == 'NR_CEP':
+            print("--- Alteração de Endereço (CEP) ---")
+            novo_cep = input("Digite o novo CEP: ")
+            endereco = self.buscar_endereco_por_cep(novo_cep)
+            if not endereco:
+                print("Alteração cancelada, CEP inválido.")
+                return
+            
+            sql_update = """
+                UPDATE T_RHSTU_ENDERECO SET 
+                    NM_LOGRADOURO = :log, 
+                    NM_BAIRRO = :bairro, 
+                    NM_CIDADE = :cidade,
+                    NR_CEP = :cep
+                WHERE ID_PACIENTE = (SELECT ID_PACIENTE FROM T_RHSTU_PACIENTE WHERE NR_CPF = :cpf)
+            """
+            params = {
+                'log': endereco.get('logradouro', ''),
+                'bairro': endereco.get('bairro', ''),
+                'cidade': endereco.get('localidade', ''),
+                'cep': novo_cep.replace('-', ''),
+                'cpf': cpf
+            }
+        else:
+            novo_valor = input(f"Digite o novo valor para {campo.replace('_', ' ').capitalize()}: ")
+            
+            tabela_sql = f"T_RHSTU_{tabela}"
+            
+            if tabela == "PACIENTE":
+                sql_update = f"UPDATE {tabela_sql} SET {campo} = :valor WHERE NR_CPF = :cpf"
+            else:
+                sql_update = f"""
+                    UPDATE {tabela_sql} SET {campo} = :valor 
+                    WHERE ID_PACIENTE = (SELECT ID_PACIENTE FROM T_RHSTU_PACIENTE WHERE NR_CPF = :cpf)
+                """
+            params = {'valor': novo_valor, 'cpf': cpf}
+
         conn = conectar()
+        if not conn:
+            return
         cursor = conn.cursor()
         try:
-            if campo == 'cep':
-                endereco = self.buscar_endereco_por_cep(novo_valor)
-                if not endereco:
-                    print("Alteração cancelada, CEP inválido.")
-                    return
-                cursor.execute("UPDATE usuarios SET logradouro = ?, bairro = ?, cidade = ? WHERE cpf = ?", 
-                               (endereco.get('logradouro', ''), endereco.get('bairro', ''), endereco.get('localidade', ''), cpf))
-
-            cursor.execute(f"UPDATE usuarios SET {campo} = ? WHERE cpf = ?", (novo_valor.upper() if campo == 'senha' else novo_valor, cpf))
+            cursor.execute(sql_update, params)
             conn.commit()
             print("\nDados atualizados com sucesso!")
-        except Exception as e:
-            print(f"\nOcorreu um erro inesperado: {e}")
+        except oracledb.DatabaseError as e:
+            conn.rollback()
+            print(f"\nErro ao atualizar dados: {e}")
         finally:
+            cursor.close()
             conn.close()
 
     def apagarConta(self, cpf):
-        """Deleta a conta do usuário do banco de dados."""
+        """Deleta o paciente e seu endereço."""
         if not self._usuario_existe(cpf):
-            print("\nUsuário não encontrado.")
+            print("\nPaciente não encontrado.")
             return
 
-        confirmacao = input("Tem certeza que deseja deletar a conta? (s/n): ").lower()
-        if confirmacao == "s":
-            conn = conectar()
-            cursor = conn.cursor()
-            try:
-                cursor.execute("DELETE FROM usuarios WHERE cpf = ?", (cpf,))
-                conn.commit()
-                print("\nConta deletada com sucesso!")
-            except Exception as e:
-                print(f"\nOcorreu um erro inesperado: {e}")
-            finally:
-                conn.close()
-        else:
+        confirmacao = input(f"Tem certeza que deseja deletar o paciente com CPF {cpf}? (s/n): ").lower()
+        if confirmacao != "s":
             print("\nOperação cancelada.")
+            return
+
+        conn = conectar()
+        if not conn:
+            return
+        cursor = conn.cursor()
+        
+        # Delatar na ordem inversa dop shcema, para não ocorrer erro foregein key
+        # 1. LEMBRETE -> 2. CONSULTA -> 3. INTERACAO -> 4. ENDERECO -> 5. PACIENTE
+        
+        try:
+            # Pega o ID do Paciente
+            cursor.execute("SELECT ID_PACIENTE FROM T_RHSTU_PACIENTE WHERE NR_CPF = :cpf", {'cpf': cpf})
+            id_paciente = cursor.fetchone()[0]
+
+            sql_del_lembrete = """
+                DELETE FROM T_RHSTU_LEMBRETE_CONSULTA 
+                WHERE ID_CONSULTA IN (SELECT ID_CONSULTA FROM T_RHSTU_CONSULTA WHERE ID_PACIENTE = :id)
+            """
+            cursor.execute(sql_del_lembrete, {'id': id_paciente})
+
+            cursor.execute("DELETE FROM T_RHSTU_CONSULTA WHERE ID_PACIENTE = :id", {'id': id_paciente})
+            
+            cursor.execute("DELETE FROM T_RHSTU_INTERACAO_CHATBOT WHERE ID_PACIENTE = :id", {'id': id_paciente})
+
+            cursor.execute("DELETE FROM T_RHSTU_ENDERECO WHERE ID_PACIENTE = :id", {'id': id_paciente})
+
+            cursor.execute("DELETE FROM T_RHSTU_PACIENTE WHERE ID_PACIENTE = :id", {'id': id_paciente})
+
+            conn.commit()
+            print(f"\nPaciente (CPF: {cpf}) e todos os seus dados associados (endereço, consultas, etc.) foram deletados com sucesso!")
+
+        except oracledb.DatabaseError as e:
+            conn.rollback()
+            print(f"\nErro ao deletar conta: {e}")
+        except Exception as e:
+            conn.rollback()
+            print(f"\nOcorreu um erro inesperado: {e}")
+        finally:
+            cursor.close()
+            conn.close()
 
     def exportar_para_json(self, cpf):
-        """Exporta os dados de um usuário para um arquivo JSON."""
+        """Exporta os dados (JOIN) de um paciente para um arquivo JSON."""
         conn = conectar()
-        conn.row_factory = sqlite3.Row
+        if not conn:
+            return
+        
         cursor = conn.cursor()
         try:
-            cursor.execute("SELECT * FROM usuarios WHERE cpf = ?", (cpf,))
-            usuario = cursor.fetchone()
-            if not usuario:
-                print("\nUsuário não encontrado.")
+            sql_join = """
+                SELECT 
+                    P.NM_COMPLETO, P.NR_CPF, P.DS_EMAIL, P.NR_TELEFONE, 
+                    P.DT_NASCIMENTO, P.FL_POSSUI_DEFICIENCIA,
+                    E.NM_LOGRADOURO, E.NR_NUMERO, E.NM_COMPLEMENTO, 
+                    E.NM_BAIRRO, E.NM_CIDADE, E.NR_CEP
+                FROM 
+                    T_RHSTU_PACIENTE P
+                JOIN 
+                    T_RHSTU_ENDERECO E ON P.ID_PACIENTE = E.ID_PACIENTE
+                WHERE 
+                    P.NR_CPF = :cpf
+            """
+            cursor.execute(sql_join, {'cpf': cpf})
+            colunas = [d[0] for d in cursor.description]
+            paciente = cursor.fetchone()
+
+            if not paciente:
+                print("\nPaciente não encontrado.")
                 return
+            
+            usuario_dict = dict(zip(colunas, paciente))
+            nome_arquivo = f"dados_paciente_{cpf}.json"
 
-            # Converte o objeto Row em um dicionário e remove a senha
-            usuario_dict = dict(usuario)
-            del usuario_dict['senha']
-
-            with open(f"dados_{cpf}.json", "w", encoding="utf-8") as json_file:
+            with open(nome_arquivo, "w", encoding="utf-8") as json_file:
                 json.dump(usuario_dict, json_file, indent=4, ensure_ascii=False)
             
-            print(f"\nDados do usuário {usuario_dict['nome']} exportados com sucesso para 'dados_{cpf}.json'.")
+            print(f"\nDados do paciente {usuario_dict['NM_COMPLETO']} exportados com sucesso para '{nome_arquivo}'.")
+
+        except oracledb.DatabaseError as e:
+            print(f"\nErro ao exportar dados: {e}")
         except Exception as e:
             print(f"\nOcorreu um erro inesperado ao exportar para JSON: {e}")
         finally:
+            cursor.close()
             conn.close()
 
-            
-
     def menuAjuda(self,usuarios, cpf):
-        """Menu de ajuda com prováveis dúvidas do usuário"""
+        """Menu de ajuda"""
         try:
             if cpf not in usuarios:
                 print("\nUsuário não encontrado.")
@@ -235,7 +401,6 @@ class UsuarioManager:
             print(f"\nOcorreu um erro inesperado: {e}")
             print("----------------------")
 
-
     def chamar_chatbot_ia(self):
         """
         Chama a API de AI & Chatbot (app.py) que está rodando localmente
@@ -252,11 +417,8 @@ class UsuarioManager:
 
         try:
             dados_json = {"pergunta": pergunta}
-            
             response = requests.post("http://127.0.0.1:5000/prever_categoria", json=dados_json)
-            
-            response.raise_for_status()
-                     
+            response.raise_for_status() 
             resposta_json = response.json()
             
             print("\n--- Resposta da API de IA ---")
