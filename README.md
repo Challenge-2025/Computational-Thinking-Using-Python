@@ -43,3 +43,4 @@
 
 ## 🎥 Link para o Vídeo Explicativo (Sprint 4)
 
+https://www.youtube.com/watch?v=E45hKajECOY
